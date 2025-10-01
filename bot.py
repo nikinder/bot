@@ -69,7 +69,7 @@ async def analyze_with_gemini(image_data: bytes) -> str:
         image = Image.open(io.BytesIO(image_data))
         
         # Используем модель с поддержкой изображений
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash-image-preview')
         
         prompt = """Ты - профессиональный диетолог и шеф-повар с 20-летним опытом. 
 Проанализируй изображение еды и дай максимально точную оценку.
@@ -309,3 +309,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
