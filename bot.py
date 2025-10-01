@@ -1,4 +1,4 @@
-﻿import os
+import os
 import io
 import logging
 import google.generativeai as genai
@@ -15,14 +15,22 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Конфигурация из переменных окружения
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8405624531:AAEDK0Me-6XkEEm3f_DebaHCN8WojmU-TsI")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")  # Обязательно установить в настройках хостинга!
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+# Проверка обязательных переменных
+if not TELEGRAM_TOKEN:
+    logger.error("TELEGRAM_TOKEN не установлен!")
+    print("❌ TELEGRAM_TOKEN не установлен! Добавьте в переменные окружения.")
+    exit(1)
+
+if not GEMINI_API_KEY:
+    logger.error("GEMINI_API_KEY не установлен!")
+    print("❌ GEMINI_API_KEY не установлен! Добавьте в переменные окружения.")
+    exit(1)
 
 # Настройка Gemini
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-else:
-    logger.error("GEMINI_API_KEY не установлен!")
+genai.configure(api_key=GEMINI_API_KEY)
 
 # Хранилище данных пользователей
 user_data = {}
@@ -57,9 +65,6 @@ def can_make_request(user_id: int):
 async def analyze_with_gemini(image_data: bytes) -> str:
     """Анализирует изображение через Google Gemini API"""
     try:
-        if not GEMINI_API_KEY:
-            return "❌ Ошибка: API ключ не настроен"
-        
         # Подготовка изображения
         image = Image.open(io.BytesIO(image_data))
         
@@ -279,10 +284,6 @@ async def help_command(update: Update, context: CallbackContext) -> None:
 
 def main() -> None:
     """Запуск бота"""
-    if not GEMINI_API_KEY:
-        logger.error("GEMINI_API_KEY не установлен! Бот не будет работать.")
-        return
-    
     application = Application.builder().token(TELEGRAM_TOKEN).build()
     
     # Добавляем обработчики
@@ -296,6 +297,10 @@ def main() -> None:
     logger.info("🚀 Бот запущен с Google Gemini API!")
     print("=" * 50)
     print("🤖 CalorieAI Bot запущен!")
+    print("📍 Хостинг: Railway")
+    print("🧠 AI: Google Gemini")
+    print("✅ Токен: Настроен")
+    print("🔑 Gemini API: Настроен")
     print("📧 Команды: /start, /stats, /help")
     print("📸 Отправьте фото еды для анализа")
     print("=" * 50)
