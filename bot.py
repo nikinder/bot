@@ -68,21 +68,22 @@ async def analyze_with_gemini(image_data: bytes) -> str:
         # Подготовка изображения
         image = Image.open(io.BytesIO(image_data))
         
-        # Используем модель с поддержкой изображений
-        model = genai.GenerativeModel('gemini-2.5-flash-image-preview')
+        # Пробуем разные модели
+        models_to_try = [
+            'gemini-1.0-pro-vision',
+            'gemini-pro-vision',
+            'gemini-1.5-flash',
+            'gemini-1.0-pro'
+        ]
         
-        prompt = """Ты - профессиональный диетолог и шеф-повар с 20-летним опытом. 
-Проанализируй изображение еды и дай максимально точную оценку.
+        for model_name in models_to_try:
+            try:
+                model = genai.GenerativeModel(model_name)
+                
+                prompt = """Ты - профессиональный диетолог. Проанализируй изображение еды и дай точную оценку калорийности.
 
-Ты ВИДИШЬ изображение! Сделай следующее:
-1. ТОЧНО определи что за блюдо на фото
-2. Определи все видимые ингредиенты
-3. Рассчитай калорийность для стандартной порции
-4. Укажи питательный состав (БЖУ)
-5. Дай полезные рекомендации по питанию
-
-Верни ответ в СТРОГОМ формате:
-🍽 **Название блюда:** [точное название блюда]
+Верни ответ в формате:
+🍽 **Название блюда:** [название]
 
 📊 **ОБЩАЯ КАЛОРИЙНОСТЬ:** ~X ккал
 
@@ -93,24 +94,26 @@ async def analyze_with_gemini(image_data: bytes) -> str:
 
 📝 **СОСТАВ БЛЮДА:**
 - [ингредиент 1]
-- [ингредиент 2] 
-- [ингредиент 3]
+- [ингредиент 2]
 
-💡 **РЕКОМЕНДАЦИИ:** [конкретные советы по питанию]
-
-Используй РЕАЛЬНЫЕ значения для стандартных порций. Будь максимально точен!"""
+💡 **РЕКОМЕНДАЦИИ:** [советы]"""
+                
+                logger.info(f"Пробуем модель: {model_name}")
+                response = model.generate_content([prompt, image])
+                
+                logger.info(f"Успешный ответ от модели {model_name}")
+                return response.text
+                
+            except Exception as e:
+                logger.warning(f"Модель {model_name} не сработала: {e}")
+                continue
         
-        logger.info("Отправка запроса к Google Gemini API...")
-        
-        # Отправка запроса с изображением
-        response = model.generate_content([prompt, image])
-        
-        logger.info("Успешный ответ от Gemini API")
-        return response.text
+        # Если ни одна модель не сработала
+        return "❌ Все модели Gemini API недоступны. Проверьте квоты и настройки billing."
             
     except Exception as e:
         logger.error(f"Error in analyze_with_gemini: {e}")
-        return f"❌ Ошибка анализа изображения: {str(e)}"
+        return f"❌ Ошибка Gemini API: {str(e)}"
 
 async def handle_photo(update: Update, context: CallbackContext) -> None:
     user = update.effective_user
@@ -129,7 +132,7 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
     # Показываем что бот работает
     processing_msg = await update.message.reply_text(
         "🔍 *Анализирую изображение...*\n\n"
-        "Google Gemini определяет блюдо и рассчитывает калории... ⏳", 
+        "Определяю блюдо и рассчитываю калории... ⏳", 
         parse_mode='Markdown'
     )
     
@@ -146,9 +149,9 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
         user_data_obj['requests_today'] += 1
         
         # Добавляем информацию о использованных запросах
-        requests_info = f"\n\n📊 *Использовано запросов сегодня:* {user_data_obj['requests_today']}/3"
+        requests_info = f"\n\n📊 Использовано запросов сегодня: {user_data_obj['requests_today']}/3"
         if user_data_obj['requests_today'] >= 3 and not user_data_obj['subscription_active']:
-            requests_info += "\n❌ *Лимит исчерпан* - приобретите подписку для продолжения"
+            requests_info += "\n❌ Лимит исчерпан - приобретите подписку для продолжения"
         
         full_response = analysis_result + requests_info
         
@@ -156,14 +159,18 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
         await processing_msg.delete()
         
         # Отправляем результат
-        await update.message.reply_text(full_response, parse_mode='Markdown')
+        if len(full_response) > 4000:
+            full_response = full_response[:4000] + "\n\n... (сообщение обрезано)"
+        
+        await update.message.reply_text(full_response)
         
     except Exception as e:
         logger.error(f"Error processing photo: {e}")
-        await processing_msg.delete()
-        await update.message.reply_text(
-            "❌ Произошла ошибка при обработке фото. Попробуйте еще раз."
-        )
+        try:
+            await processing_msg.delete()
+        except:
+            pass
+        await update.message.reply_text("❌ Произошла ошибка при обработке фото. Попробуйте еще раз.")
 
 async def start(update: Update, context: CallbackContext) -> None:
     user = update.effective_user
@@ -309,4 +316,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
